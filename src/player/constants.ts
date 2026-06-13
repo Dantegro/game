@@ -41,27 +41,21 @@ export const BOX_TOP_LAND_MARGIN = 0.13;
 export const TERRAIN_STICK_FEET = 0.25;
 
 /**
- * Look-behind / rear glance (hold C) tuning and transition.
- * This feature moves the camera behind the player and orients it to look at your character
- * so you can see yourself from behind while continuing to move in the direction you were facing.
- * It is intentionally a temporary "look over your shoulder" / rear view rather than a full
- * third-person follow cam.
+ * Third-person view (hold C) tuning and transition.
+ * Camera position pulls back behind the player (offset based on current look yaw).
+ * Camera orientation in third-person uses the same free look direction as first-person
+ * (mouse-controlled), so you control where you're looking while the camera trails behind
+ * and you can see your character running in that direction. This is a proper trailing
+ * third-person camera (not a forced "stare at my own back" look-behind).
  */
-export const LOOK_BEHIND_DISTANCE = 4.2;      // meters behind the player (horizontal)
-export const LOOK_BEHIND_HEIGHT = 1.7;        // meters above the eye when fully looking behind
-export const LOOK_BEHIND_TARGET_HEIGHT = 0.6; // vertical offset from eye for the look-at target on the character
-export const LOOK_BEHIND_TRANSITION_TAU = 0.22; // seconds; exponential smoothing for the glance animation
+export const THIRD_PERSON_DISTANCE = 4.2;      // meters behind the player (horizontal)
+export const THIRD_PERSON_HEIGHT = 1.7;        // meters above the eye when in full third-person
+export const THIRD_PERSON_TRANSITION_TAU = 0.22; // seconds; exponential smoothing for the camera pull-back animation
 
-/** Time constant for damping the look-at target point used to orient the camera while looking behind.
- *  Reduces high-frequency jitter from terrain following (the fixed 0.25 lerp in collision), collision
- *  pushes, and ground ray samples when the camera is offset and sprint speed (thus traversal rate
- *  over uneven ground) is changing during the transition. Position blend remains direct/snappy. */
-export const LOOK_BEHIND_LOOK_TARGET_TAU = 0.10;
-
-/** Time constant for light position smoothing on the render camera during look-behind transitions.
- *  Applied only while the blend t is in the active range (not extremely close to 0 or 1).
- *  This damps residual left/right (and other) jitter in camera position caused by high-speed movement,
- *  jumping/landing snaps, and the last tiny steps of the exponential transition at full sprint.
- *  Once the animation has practically completed (t within ~3%), we switch to direct exact placement
- *  for responsive feel in steady FP or full look-back. */
-export const LOOK_BEHIND_POSITION_TAU = 0.05;
+/** Time constant for light position (and quat) smoothing applied to the render camera *only during
+ *  the active third-person transition* (when blend t is between ~3% and 97%). This damps L/R and
+ *  other jitter from high-speed sprint + jumping/landing eye corrections while the blend amount
+ *  is still changing (including the final asymptotic steps of the transition). Once the animation
+ *  has practically completed, we switch to direct exact placement for responsive steady-state
+ *  first-person or full third-person. */
+export const THIRD_PERSON_POSITION_SMOOTH_TAU = 0.05;

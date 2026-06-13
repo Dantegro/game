@@ -10,8 +10,8 @@ import { placePlayerOnGround } from "./player/collision.js";
 import { buildGameStartOverlay } from "./ui/gameOverlay.js";
 import {
   createPlayerModel,
-  stepLookBehindTransition,
-  updateLookBehindView,
+  stepThirdPersonTransition,
+  updateThirdPersonView,
 } from "./player/view.js";
 
 export interface PlayerAPI {
@@ -43,7 +43,8 @@ export function initPlayerControls(
 
   // renderCamera is the one actually used by the renderer and exposed on the API.
   // We position + orient it every frame. Normally it sits at the eye (first-person).
-  // When the look-behind key is held we animate it behind the player and point it at the character.
+  // When the third-person key (C) is held we pull it back behind the player while
+  // keeping the free mouse look orientation.
   const renderCamera = new THREE.PerspectiveCamera(
     75,
     window.innerWidth / window.innerHeight,
@@ -133,12 +134,12 @@ export function initPlayerControls(
   );
   movementState.prevFeetY = spawnGroundY;
 
-  // Visible player avatar. It becomes visible while the player is looking behind so you can see
-  // your own character from the rear. Hidden in normal first-person view.
+  // Visible player avatar. It becomes visible in third-person so you can see your own
+  // character from behind. Hidden in normal first-person view.
   const playerModel = createPlayerModel();
 
-  // 0 = normal first-person, 1 = full look-behind (rear view). Driven by holding the C key.
-  let lookBehindT = 0;
+  // 0 = normal first-person, 1 = full third-person. Driven by holding the C key.
+  let thirdPersonT = 0;
 
   function readInput(): MovementInput {
     return {
@@ -165,19 +166,21 @@ export function initPlayerControls(
       controls.isLocked,
     );
 
-    // Hold C to look behind you (see your character from the rear / over-the-shoulder glance).
-    // The render camera animates smoothly behind the player and orients to look at the avatar.
-    // Movement direction (and model facing) continue to follow the mouse look (lookCamera quaternion).
-    // Releasing C smoothly returns the camera to the normal first-person eye position + orientation.
-    const holdingLookBehind = !!keys["KeyC"];
-    const targetT = holdingLookBehind ? 1 : 0;
-    lookBehindT = stepLookBehindTransition(lookBehindT, targetT, delta);
+    // Hold C for third-person view.
+    // The render camera smoothly pulls back to a position behind the player (offset based on
+    // the current mouse look yaw + height). The camera orientation stays the free mouse look
+    // direction (same as first-person), so you control where you're looking while seeing your
+    // character running in that direction from behind. Movement direction follows the mouse
+    // (lookCamera quaternion). Releasing C smoothly returns the camera to the eye position.
+    const holdingThirdPerson = !!keys["KeyC"];
+    const targetT = holdingThirdPerson ? 1 : 0;
+    thirdPersonT = stepThirdPersonTransition(thirdPersonT, targetT, delta);
 
-    updateLookBehindView(
+    updateThirdPersonView(
       renderCamera,
       playerEyePos,
       lookCamera.quaternion,
-      lookBehindT,
+      thirdPersonT,
       playerModel,
       delta,
     );

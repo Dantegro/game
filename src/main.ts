@@ -65,7 +65,7 @@ let getStamina: (() => number) | undefined = undefined;
 let gameClouds: CloudGroup[] = [];
 
 // The player avatar model returned by initPlayerControls. It is added to the scene while playing
-// and becomes visible when the player holds the look-behind key (C) so you can see your character from behind.
+// and becomes visible in third-person (hold C) so you can see your character from behind.
 let playerMesh: THREE.Object3D | undefined;
 
 const menuStyles = injectMainMenuStyles();

@@ -27,7 +27,7 @@ export function buildGameStartOverlay(onExitToMenu?: () => void): GameStartOverl
     title.textContent = "Paused";
 
     const info = document.createElement("div");
-    info.innerHTML = "Click anywhere to resume<br><small>ESC also resumes • Shift to sprint (stamina) • Hold C to look behind</small>";
+    info.innerHTML = "Click anywhere to resume<br><small>ESC also resumes • Shift to sprint (stamina) • Hold C for third person</small>";
 
     const backBtn = document.createElement("button");
     backBtn.textContent = "Back to Menu";
@@ -46,7 +46,7 @@ export function buildGameStartOverlay(onExitToMenu?: () => void): GameStartOverl
   } else {
     // Original entry prompt (if ever called without callback)
     content.innerHTML =
-      '<span aria-hidden="true">Click to start<br><small>WASD to move • Space to jump • Mouse to look • Hold C to look behind</small><br><small>(enters fullscreen for immersion)</small></span>';
+      '<span aria-hidden="true">Click to start<br><small>WASD to move • Space to jump • Mouse to look • Hold C for third person</small><br><small>(enters fullscreen for immersion)</small></span>';
 
     applyA11y(overlay, {
       "aria-label":
