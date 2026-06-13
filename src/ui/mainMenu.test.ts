@@ -54,7 +54,7 @@ describe("buildMainMenu", () => {
 
     expect(menu.root.id).toBe("main-menu");
     expect(menu.root.getAttribute("role")).toBe("dialog");
-    expect(menu.root.querySelector("#menu-title")?.textContent).toBe("Vibe Parkour");
+    expect(menu.root.querySelector("#menu-title")?.textContent).toBe("Parkour Vibes");
     expect(menu.root.querySelector(".menu-logo")).toBeTruthy();
     expect(menu.startButton.disabled).toBe(true);
   });

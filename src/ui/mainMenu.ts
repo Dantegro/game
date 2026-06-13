@@ -350,7 +350,7 @@ export function buildMainMenu(): MainMenuElements {
   const title = document.createElement("h1");
   title.id = "menu-title";
   title.className = "menu-title";
-  title.textContent = "Vibe Parkour";
+  title.textContent = "Parkour Vibes";
 
   const gamesLabel = document.createElement("div");
   gamesLabel.id = "game-modes-label";

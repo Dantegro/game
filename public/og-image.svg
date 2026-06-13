@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-label="Vibe Parkour">
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-label="Parkour Vibes">
   <defs>
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#0f0f14" />
@@ -7,7 +7,7 @@
   </defs>
   <rect width="1200" height="630" fill="url(#bg)" />
   <rect x="80" y="80" width="4" height="470" fill="#4a6a4a" />
-  <text x="120" y="280" fill="#d8d8e2" font-family="system-ui, sans-serif" font-size="72" letter-spacing="8">VIBE PARKOUR</text>
+  <text x="120" y="280" fill="#d8d8e2" font-family="system-ui, sans-serif" font-size="72" letter-spacing="8">PARKOUR VIBES</text>
   <text x="120" y="340" fill="#8a8a96" font-family="system-ui, sans-serif" font-size="28" letter-spacing="4">FREE BROWSER PARKOUR GAME</text>
   <text x="120" y="420" fill="#6a8a6a" font-family="system-ui, sans-serif" font-size="24">game.dantegro.com</text>
 </svg>
