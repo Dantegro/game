@@ -120,7 +120,7 @@ export function initPlayerControls(
   const WALL_FRICTION = 0.82;       // < 1.0 slows you down while scraping/sliding along walls
   const MAX_STEP_HEIGHT = 1.8;      // max vertical step we allow "walking/jumping onto" without horizontal side block
   const OVERHEAD_CLEARANCE = 0.5;   // underside must be this far above feet to count as a ceiling bonk
-  const LAND_SNAP_TOLERANCE = 0.3;  // mid-air: feet must be within this of box top to land (not vacuum from below)
+  const LAND_SNAP_TOLERANCE = 0.4;  // mid-air: feet must be within this of box top to land (not vacuum from below)
 
   // Raycaster for sampling the actual height of the uneven ground mesh
   const raycaster = new THREE.Raycaster();
