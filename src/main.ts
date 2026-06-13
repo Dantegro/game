@@ -1,5 +1,7 @@
 import * as THREE from "three";
 import { createWorld } from "./scene.js";
+import type { CloudGroup } from "./world/clouds.js";
+import { disposeCloudGeometry, getCloudPuffGeometry } from "./world/clouds.js";
 import { initPlayerControls } from "./controls.js";
 import {
   initBackgroundMusic,
@@ -59,6 +61,8 @@ let currentWorld: ReturnType<typeof createWorld> | undefined;
 let staminaBar: ReturnType<typeof import("./ui/staminaBar.js").createStaminaBar> | undefined;
 let getStamina: (() => number) | undefined = undefined;
 
+let gameClouds: CloudGroup[] = [];
+
 const menuStyles = injectMainMenuStyles();
 const menuStyle = menuStyles.element;
 const mainMenu = buildMainMenu();
@@ -97,6 +101,7 @@ function startGame() {
 
   scene = worldToUse.scene;
   cube = worldToUse.cube;
+  gameClouds = worldToUse.clouds;
 
   const playerAPI = initPlayerControls(
     renderer.domElement,
@@ -177,6 +182,7 @@ function exitToMenu() {
     staminaBar = undefined;
   }
   getStamina = undefined;
+  gameClouds = [];
 }
 
 function animate() {
@@ -195,6 +201,19 @@ function animate() {
     staminaBar.update(getStamina(), 100); // 100 = STAMINA_MAX (see player/constants.ts)
   }
 
+  // Slowly drift clouds across the sky (parallax with different speeds)
+  for (const cloud of gameClouds) {
+    const speed = cloud.userData.speed;
+    cloud.position.x += speed * delta;
+
+    // Seamless wrap so the sky never runs out of clouds
+    if (cloud.position.x > 250) {
+      cloud.position.x = -250 - Math.random() * 30;
+      cloud.position.z = (Math.random() - 0.5) * 400;
+      cloud.position.y = 82 + Math.random() * 55;
+    }
+  }
+
   // Keep the red cube spinning so we can see rendering is alive
   cube.rotation.y += 0.01;
 
@@ -202,9 +221,12 @@ function animate() {
 }
 
 function disposeWorld(world: ReturnType<typeof createWorld>) {
+  const sharedCloudGeo = getCloudPuffGeometry();
   world.scene.traverse((child) => {
     if (!(child instanceof THREE.Mesh)) return;
-    child.geometry.dispose();
+    if (child.geometry !== sharedCloudGeo) {
+      child.geometry.dispose();
+    }
     const mat = child.material;
     if (Array.isArray(mat)) {
       for (const m of mat) m.dispose();
@@ -212,6 +234,7 @@ function disposeWorld(world: ReturnType<typeof createWorld>) {
       mat.dispose();
     }
   });
+  disposeCloudGeometry();
 }
 
 function generatePreview(regenerate = false) {
@@ -242,7 +265,17 @@ function generatePreview(regenerate = false) {
   cam.position.set(center.x, 90, center.z);
   cam.lookAt(center.x, 0, center.z);
 
+  // Temporarily hide clouds for the map preview only (so the top-down view cleanly shows
+  // the box/terrain layout the player is evaluating). Restore immediately so the world
+  // object (and its clouds) can still be reused for actual gameplay if the user starts.
+  const clouds = currentWorld.clouds;
+  for (const cloud of clouds) {
+    cloud.visible = false;
+  }
   previewRenderer!.render(currentWorld.scene, cam);
+  for (const cloud of clouds) {
+    cloud.visible = true;
+  }
 }
 
 // Wire regenerate (player can re-roll until the box layout looks good)
@@ -322,6 +355,7 @@ if (import.meta.hot) {
       staminaBar = undefined;
     }
     getStamina = undefined;
+    gameClouds = [];
     if (mainMenu.root.parentNode) mainMenu.root.remove();
     if (menuStyle.parentNode) menuStyle.remove();
     renderer.dispose();

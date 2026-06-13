@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { createClouds } from "./world/clouds.js";
 
 export function createWorld() {
   const scene = new THREE.Scene();
@@ -49,6 +50,8 @@ export function createWorld() {
     new THREE.MeshLambertMaterial({ vertexColors: true }),
   );
   scene.add(ground);
+
+  const clouds = createClouds(scene);
 
   const collidables: THREE.Mesh[] = [];
 
@@ -143,5 +146,5 @@ export function createWorld() {
     }
   }
 
-  return { scene, cube, collidables, ground };
+  return { scene, cube, collidables, ground, clouds };
 }
