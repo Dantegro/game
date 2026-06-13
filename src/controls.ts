@@ -25,7 +25,7 @@ export function initPlayerControls(domElement: HTMLElement): PlayerAPI {
   instructions.style.cssText =
     "position:fixed;inset:0;display:grid;place-items:center;color:#ccc;font-family:sans-serif;text-align:center;z-index:10;background:linear-gradient(rgba(0,0,0,0.12),rgba(0,0,0,0.2));user-select:none;cursor:pointer;";
   instructions.innerHTML =
-    "Click to start<br><small>WASD to move • Mouse to look</small>";
+    "Click to start<br><small>WASD to move • Space to jump • Mouse to look</small>";
   document.body.appendChild(instructions);
 
   instructions.addEventListener("click", (event) => {
@@ -54,24 +54,51 @@ export function initPlayerControls(domElement: HTMLElement): PlayerAPI {
   const velocity = new THREE.Vector3();
   const direction = new THREE.Vector3();
 
+  // Vertical physics state for jumping
+  let velocityY = 0;
+  let canJump = true;
+
+  // Tuning values (feel free to adjust)
+  const PLAYER_HEIGHT = 3;   // camera y when standing on the ground
+  const GRAVITY = 30;        // units per second squared
+  const JUMP_VELOCITY = 12;  // initial upward speed on jump
+
   function updateMovement(delta: number) {
-    if (controls.isLocked) {
-      // Get movement direction from keys
-      direction.z = (keys["KeyW"] ? 1 : 0) - (keys["KeyS"] ? 1 : 0);
-      direction.x = (keys["KeyD"] ? 1 : 0) - (keys["KeyA"] ? 1 : 0);
-      direction.y = 0;
+    if (!controls.isLocked) return;
 
-      if (direction.lengthSq() > 0) {
-        direction.normalize();
+    // --- Horizontal movement (WASD) ---
+    // Get movement direction from keys
+    direction.z = (keys["KeyW"] ? 1 : 0) - (keys["KeyS"] ? 1 : 0);
+    direction.x = (keys["KeyD"] ? 1 : 0) - (keys["KeyA"] ? 1 : 0);
+    direction.y = 0;
 
-        // Time-based movement (smoother and more reliable)
-        const speed = 25; // adjust this value if movement feels too fast/slow
-        velocity.x = direction.x * speed * delta;
-        velocity.z = direction.z * speed * delta;
+    if (direction.lengthSq() > 0) {
+      direction.normalize();
 
-        controls.moveRight(velocity.x);
-        controls.moveForward(velocity.z);
-      }
+      // Time-based movement (smoother and more reliable)
+      const speed = 25; // adjust this value if movement feels too fast/slow
+      velocity.x = direction.x * speed * delta;
+      velocity.z = direction.z * speed * delta;
+
+      controls.moveRight(velocity.x);
+      controls.moveForward(velocity.z);
+    }
+
+    // --- Vertical movement (gravity + jumping) ---
+    velocityY -= GRAVITY * delta;
+    camera.position.y += velocityY * delta;
+
+    // Ground collision & landing
+    if (camera.position.y < PLAYER_HEIGHT) {
+      camera.position.y = PLAYER_HEIGHT;
+      velocityY = 0;
+      canJump = true;
+    }
+
+    // Jump input (only when on the ground)
+    if (keys["Space"] && canJump) {
+      velocityY = JUMP_VELOCITY;
+      canJump = false;
     }
   }
 
