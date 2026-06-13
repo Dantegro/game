@@ -55,6 +55,9 @@ let selectedGameMode: string | null = null;
 let previewRenderer: THREE.WebGLRenderer | undefined;
 let currentWorld: ReturnType<typeof createWorld> | undefined;
 
+let staminaBar: ReturnType<typeof import("./ui/staminaBar.js").createStaminaBar> | undefined;
+let getStamina: (() => number) | undefined = undefined;
+
 const menuStyles = injectMainMenuStyles();
 const menuStyle = menuStyles.element;
 const mainMenu = buildMainMenu();
@@ -115,12 +118,21 @@ function startGame() {
   camera = playerAPI.camera;
   updateMovement = playerAPI.updateMovement;
   disposeControls = playerAPI.dispose;
+  getStamina = playerAPI.getStamina || undefined;
 
   // Reveal the 3D canvas and kick off the game loop
   c.style.display = "block";
   c.removeAttribute("aria-hidden");
   prevTime = performance.now();
   animate();
+
+  // Create and show the stamina bar for the sprinting system.
+  // It is driven every frame from the same updateMovement call that the player feels.
+  import("./ui/staminaBar.js").then(({ createStaminaBar }) => {
+    staminaBar = createStaminaBar();
+    document.body.appendChild(staminaBar.element);
+    staminaBar.show();
+  });
 
   // Immediately enter the game on first start from the menu (auto lock + fullscreen).
   // The pause/resume overlay is kept hidden initially so the player drops straight into gameplay.
@@ -170,6 +182,12 @@ function exitToMenu() {
       previewRenderer.setSize(PREVIEW_SIZE, PREVIEW_SIZE);
     }
   }
+
+  if (staminaBar) {
+    staminaBar.remove();
+    staminaBar = undefined;
+  }
+  getStamina = undefined;
 }
 
 function animate() {
@@ -182,6 +200,11 @@ function animate() {
   prevTime = time;
 
   updateMovement(delta);
+
+  // Drive stamina UI (if present) from the same movement state the player is using.
+  if (staminaBar && getStamina) {
+    staminaBar.update(getStamina(), 100); // 100 = STAMINA_MAX (see player/constants.ts)
+  }
 
   // Keep the red cube spinning so we can see rendering is alive
   cube.rotation.y += 0.01;
@@ -307,6 +330,11 @@ if (import.meta.hot) {
       disposeWorld(currentWorld);
       currentWorld = undefined;
     }
+    if (staminaBar) {
+      staminaBar.remove();
+      staminaBar = undefined;
+    }
+    getStamina = undefined;
     if (mainMenu.root.parentNode) mainMenu.root.remove();
     if (menuStyle.parentNode) menuStyle.remove();
     renderer.dispose();

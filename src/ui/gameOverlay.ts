@@ -27,7 +27,7 @@ export function buildGameStartOverlay(onExitToMenu?: () => void): GameStartOverl
     title.textContent = "Paused";
 
     const info = document.createElement("div");
-    info.innerHTML = "Click anywhere to resume<br><small>ESC also resumes</small>";
+    info.innerHTML = "Click anywhere to resume<br><small>ESC also resumes • Shift to sprint (stamina)</small>";
 
     const backBtn = document.createElement("button");
     backBtn.textContent = "Back to Menu";

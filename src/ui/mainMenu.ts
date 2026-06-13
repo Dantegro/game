@@ -348,7 +348,7 @@ export function buildMainMenu(): MainMenuElements {
   hint.id = "menu-hint";
   hint.style.cssText = "margin:14px 0 0;font-size:10px;opacity:0.35;";
   hint.textContent =
-    "Select a game mode, then press START GAME or Enter to begin. M toggles music. WASD and mouse after lock. Regenerate if the preview layout looks bad.";
+    "Select a game mode, then press START GAME or Enter to begin. Shift = sprint (stamina limited). M toggles music. WASD and mouse after lock. Regenerate if the preview layout looks bad.";
 
   root.append(logo, title, tagline, gamesLabel, modeGroup, previewSection, startButton, volumeContainer, hint);
 

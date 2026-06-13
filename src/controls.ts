@@ -14,6 +14,7 @@ export interface PlayerAPI {
   controls: PointerLockControls;
   updateMovement: (delta: number) => void;
   dispose: () => void;
+  getStamina: () => number;
 }
 
 export function initPlayerControls(
@@ -115,6 +116,7 @@ export function initPlayerControls(
       forward: (keys["KeyW"] ? 1 : 0) - (keys["KeyS"] ? 1 : 0),
       strafe: (keys["KeyD"] ? 1 : 0) - (keys["KeyA"] ? 1 : 0),
       jump: keys["Space"] ?? false,
+      sprint: !!(keys["ShiftLeft"] || keys["ShiftRight"]),
     };
   }
 
@@ -144,5 +146,6 @@ export function initPlayerControls(
     controls,
     updateMovement,
     dispose,
+    getStamina: () => movementState.stamina,
   };
 }
