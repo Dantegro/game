@@ -257,7 +257,7 @@ export function buildMainMenu(): MainMenuElements {
   title.id = "menu-title";
   title.style.cssText =
     "font-size:48px;letter-spacing:5px;margin:0 0 2px;font-weight:normal;color:#d8d8e2;";
-  title.textContent = "VIBE WORLD";
+  title.textContent = "VIBE PARKOUR";
 
   const tagline = document.createElement("p");
   tagline.style.cssText =

@@ -29,7 +29,7 @@ export function initBackgroundMusic(src = '/sounds/lofi-ambient.mp3') {
   // Graceful failure if file is missing (e.g. wrong filename or path)
   audio.addEventListener('error', () => {
     console.warn(
-      `[Vibe World] Could not load background music from "${src}". ` +
+      `[Vibe Parkour] Could not load background music from "${src}". ` +
       `Make sure a track exists at public/sounds/lofi-ambient.mp3`
     );
     audio = null;
@@ -56,7 +56,7 @@ export function playBackgroundMusic() {
     playPromise.catch((err) => {
       // Autoplay was blocked – this is normal until a gesture happens.
       // The next user click (selection or start button) will usually succeed.
-      console.debug('[Vibe World] Music play blocked until user gesture:', err);
+      console.debug('[Vibe Parkour] Music play blocked until user gesture:', err);
     });
   }
 }

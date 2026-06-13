@@ -1,4 +1,4 @@
-# Vibe World
+# Vibe Parkour
 
 A browser-based **parkour / vibe** game — chill movement, lofi ambience, and procedural obstacles to climb. Built with **Three.js**, **TypeScript**, and **Vite**.
 
