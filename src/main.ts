@@ -1,6 +1,12 @@
 import * as THREE from "three";
 import { createWorld } from "./scene.js";
 import { initPlayerControls } from "./controls.js";
+import {
+  initBackgroundMusic,
+  playBackgroundMusic,
+  toggleBackgroundMusic,
+  disposeBackgroundMusic,
+} from "./audio.js";
 
 const canvas = document.querySelector("#game") as HTMLCanvasElement;
 
@@ -238,17 +244,20 @@ startBtnEl = startBtn;
 
 const hint = document.createElement("div");
 hint.style.cssText = "margin-top:14px;font-size:10px;opacity:0.35;";
-hint.textContent = "Press START GAME (or Enter) to begin • WASD + mouse after lock";
+hint.textContent = "Press START GAME (or Enter) to begin • M to toggle lofi music • WASD + mouse after lock";
 
 menu.append(title, tagline, gamesLabel, gameEntry, startBtn, hint);
 document.body.appendChild(menu);
+
+// Preload lofi music early (no sound until user gesture)
+initBackgroundMusic();
 
 // Selection on the game mode entry:
 // - Plays a pop/scale animation
 // - Slides in a left accent bar
 // - Updates status to "✓ SELECTED" with color shift
 // - Enables the START GAME button
-// The button (and Enter) are blocked until a mode is selected.
+// - Starts the lofi background music (triggered by user gesture)
 gameEntry.addEventListener("click", () => {
   selectedGameMode = 'open-world';
   gameEntry.classList.add('selected');
@@ -263,6 +272,9 @@ gameEntry.addEventListener("click", () => {
     startBtnEl.disabled = false;
     startBtnEl.classList.remove('disabled');
   }
+
+  // Start the chill lofi track
+  playBackgroundMusic();
 
   // Trigger the actual selection animation
   gameEntry.classList.add('selecting');
@@ -279,9 +291,18 @@ window.addEventListener("keydown", (e) => {
   }
 });
 
+// Global music toggle (works on the menu and after entering the game world)
+window.addEventListener("keydown", (e) => {
+  if (e.code === "KeyM") {
+    e.preventDefault();
+    toggleBackgroundMusic();
+  }
+});
+
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {
     if (disposeControls) disposeControls();
+    disposeBackgroundMusic();
     if (menu && menu.parentNode) menu.remove();
     if (menuStyle && menuStyle.parentNode) menuStyle.remove();
     renderer.dispose();
