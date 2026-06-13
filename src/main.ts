@@ -19,6 +19,8 @@ import {
   setMapPreviewVisible,
   setStartButtonEnabled,
 } from "./ui/mainMenu.js";
+import { createStaminaBar, type StaminaBar } from "./ui/staminaBar.js";
+import { STAMINA_MAX } from "./player/constants.js";
 
 const canvas = document.querySelector("#game") as HTMLCanvasElement;
 // Menu is the primary UI until the game starts; hide decorative canvas from AT.
@@ -59,7 +61,7 @@ let selectedGameMode: GameModeId | null = null;
 let previewRenderer: THREE.WebGLRenderer | undefined;
 let currentWorld: ReturnType<typeof createWorld> | undefined;
 
-let staminaBar: ReturnType<typeof import("./ui/staminaBar.js").createStaminaBar> | undefined;
+let staminaBar: StaminaBar | undefined;
 let getStamina: (() => number) | undefined = undefined;
 
 let gameClouds: CloudGroup[] = [];
@@ -130,13 +132,10 @@ function startGame() {
   prevTime = performance.now();
   animate();
 
-  // Create and show the stamina bar for the sprinting system.
-  // It is driven every frame from the same updateMovement call that the player feels.
-  import("./ui/staminaBar.js").then(({ createStaminaBar }) => {
-    staminaBar = createStaminaBar();
-    document.body.appendChild(staminaBar.element);
-    staminaBar.show();
-  });
+  // Create and show the stamina bar for the sprinting system (DOM only; module is static-imported).
+  staminaBar = createStaminaBar();
+  document.body.appendChild(staminaBar.element);
+  staminaBar.show();
 
   // Immediately enter the game on first start from the menu (auto lock + fullscreen).
   // The pause/resume overlay is kept hidden initially so the player drops straight into gameplay.
@@ -226,7 +225,7 @@ function animate() {
 
   // Drive stamina UI (if present) from the same movement state the player is using.
   if (staminaBar && getStamina) {
-    staminaBar.update(getStamina(), 100); // 100 = STAMINA_MAX (see player/constants.ts)
+    staminaBar.update(getStamina(), STAMINA_MAX);
   }
 
   // Slowly drift clouds across the sky (parallax with different speeds)
