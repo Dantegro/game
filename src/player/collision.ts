@@ -204,8 +204,13 @@ function evaluateBoxLanding(
   const pFeet = feetY(eyeY);
   const stepDown = pFeet - box.max.y;
 
-  // Already standing on or above this surface.
-  if (stepDown >= -0.05 && stepDown <= 0.12 && ctx.velocityY <= 0) {
+  // Already resting on this surface (feet at or barely below the top plane).
+  if (
+    stepDown >= -0.03 &&
+    stepDown <= 0.08 &&
+    ctx.velocityY <= 0 &&
+    pFeet >= box.max.y - 0.05
+  ) {
     return { topY: box.max.y, priority: box.max.y };
   }
 
