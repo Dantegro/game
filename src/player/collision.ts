@@ -1,15 +1,33 @@
 import * as THREE from "three";
 import {
+  BOX_REST_FEET_MARGIN,
+  BOX_REST_STEP_MAX,
+  BOX_REST_STEP_MIN,
   BOX_TOP_EDGE_GRACE,
   BOX_TOP_LAND_MARGIN,
+  FEET_ON_BOX_MARGIN,
+  FEET_RESTING_STEP_MAX,
+  FEET_RESTING_STEP_MIN,
   LAND_SNAP_TOLERANCE,
+  ON_TERRAIN_FEET_ABOVE,
   PLAYER_EYE_HEIGHT,
   PLAYER_FEET_OFFSET,
   PLAYER_HEAD_OFFSET,
   PLAYER_RADIUS,
+  RISING_VELOCITY_THRESHOLD,
+  TERRAIN_GROUND_SMOOTH_TAU_DOWN,
+  TERRAIN_GROUND_SMOOTH_TAU_UP,
+  TERRAIN_MAX_SINK,
+  TERRAIN_PENETRATION_TOLERANCE,
+  TERRAIN_SAMPLE_MIDPOINT_WEIGHT,
+  TERRAIN_SAMPLE_MOVE_THRESHOLD,
+  TERRAIN_SAMPLE_PRIMARY_WEIGHT,
+  TERRAIN_STICK_BELOW,
   TERRAIN_STICK_FEET,
+  TERRAIN_STICK_LEAVE,
   WALL_FRICTION,
 } from "./constants.js";
+import type { MovementState } from "./movement.js";
 
 const _down = new THREE.Vector3(0, -1, 0);
 const _box = new THREE.Box3();
@@ -17,13 +35,6 @@ const _box = new THREE.Box3();
 export interface CollisionWorld {
   collidables: THREE.Mesh[];
   groundMesh?: THREE.Mesh;
-}
-
-export interface FloorContext {
-  velocityY: number;
-  canJump: boolean;
-  /** Feet Y from the previous frame (for swept top-plane landing). */
-  prevFeetY: number;
 }
 
 export function sampleGroundHeight(
@@ -37,6 +48,46 @@ export function sampleGroundHeight(
   raycaster.set(rayOrigin, _down);
   const hits = raycaster.intersectObject(groundMesh, false);
   return hits.length > 0 ? hits[0].point.y : 0;
+}
+
+/**
+ * Sample terrain height with light spatial averaging between the current XZ and the
+ * midpoint from the previous frame. Reduces pops when sprinting across triangle edges.
+ */
+function sampleTerrainHeight(
+  groundMesh: THREE.Mesh,
+  x: number,
+  z: number,
+  prevX: number,
+  prevZ: number,
+  raycaster: THREE.Raycaster,
+  rayOrigin: THREE.Vector3,
+): number {
+  const h = sampleGroundHeight(groundMesh, x, z, raycaster, rayOrigin);
+  const moved = Math.hypot(x - prevX, z - prevZ);
+  if (moved < TERRAIN_SAMPLE_MOVE_THRESHOLD) return h;
+
+  const mx = (x + prevX) * 0.5;
+  const mz = (z + prevZ) * 0.5;
+  const hm = sampleGroundHeight(groundMesh, mx, mz, raycaster, rayOrigin);
+  return (
+    h * TERRAIN_SAMPLE_PRIMARY_WEIGHT + hm * TERRAIN_SAMPLE_MIDPOINT_WEIGHT
+  );
+}
+
+function smoothGroundHeight(
+  smoothed: number,
+  target: number,
+  delta: number,
+): number {
+  const rising = target > smoothed;
+  const tau = rising ? TERRAIN_GROUND_SMOOTH_TAU_UP : TERRAIN_GROUND_SMOOTH_TAU_DOWN;
+  const alpha = delta > 0 ? 1 - Math.exp(-delta / tau) : 0.25;
+  let next = smoothed + (target - smoothed) * alpha;
+  if (rising) {
+    next = Math.max(next, target - TERRAIN_MAX_SINK);
+  }
+  return next;
 }
 
 /** Place the camera at standing height over sampled terrain at its current XZ. */
@@ -65,7 +116,7 @@ function recoverFromTerrainPenetration(
   if (feetOnBox) return null;
 
   const pFeet = feetY(eyePos.y);
-  if (pFeet >= groundHeight - 0.05) return null;
+  if (pFeet >= groundHeight - TERRAIN_PENETRATION_TOLERANCE) return null;
 
   eyePos.y = groundHeight + PLAYER_EYE_HEIGHT;
   return {
@@ -73,6 +124,7 @@ function recoverFromTerrainPenetration(
     canJump: true,
     onSurface: true,
     feetY: groundHeight,
+    smoothedGroundY: groundHeight,
   };
 }
 
@@ -86,22 +138,21 @@ function headY(eyeY: number): number {
 
 /** XZ circle overlaps the box footprint (player radius). */
 function overlapsXZ(px: number, pz: number, box: THREE.Box3): boolean {
-  const nearestX = THREE.MathUtils.clamp(px, box.min.x, box.max.x);
-  const nearestZ = THREE.MathUtils.clamp(pz, box.min.z, box.max.z);
+  return overlapsXZExpanded(px, pz, box, 0);
+}
+
+/** XZ circle overlaps the box footprint expanded by `expand` (lip / corner landings). */
+function overlapsXZExpanded(
+  px: number,
+  pz: number,
+  box: THREE.Box3,
+  expand: number,
+): boolean {
+  const nearestX = THREE.MathUtils.clamp(px, box.min.x - expand, box.max.x + expand);
+  const nearestZ = THREE.MathUtils.clamp(pz, box.min.z - expand, box.max.z + expand);
   const dx = px - nearestX;
   const dz = pz - nearestZ;
   return dx * dx + dz * dz <= PLAYER_RADIUS * PLAYER_RADIUS;
-}
-
-/** Eye XZ over the box top face, with a small edge grace for lip landings. */
-function isNearBoxTop(px: number, pz: number, box: THREE.Box3): boolean {
-  const g = BOX_TOP_EDGE_GRACE;
-  return (
-    px >= box.min.x - g &&
-    px <= box.max.x + g &&
-    pz >= box.min.z - g &&
-    pz <= box.max.z + g
-  );
 }
 
 /**
@@ -181,6 +232,7 @@ export interface FloorResolveResult {
   canJump: boolean;
   onSurface: boolean;
   feetY: number;
+  smoothedGroundY: number;
 }
 
 interface BoxLandingCandidate {
@@ -196,20 +248,24 @@ function evaluateBoxLanding(
   px: number,
   pz: number,
   box: THREE.Box3,
-  ctx: FloorContext,
+  state: MovementState,
   groundHeight: number,
 ): BoxLandingCandidate | null {
-  if (!overlapsXZ(px, pz, box)) return null;
+  const falling = state.velocityY < 0;
+  const xzOverlap = falling
+    ? overlapsXZExpanded(px, pz, box, BOX_TOP_EDGE_GRACE)
+    : overlapsXZ(px, pz, box);
+  if (!xzOverlap) return null;
 
   const pFeet = feetY(eyeY);
   const stepDown = pFeet - box.max.y;
 
   // Already resting on this surface (feet at or barely below the top plane).
   if (
-    stepDown >= -0.03 &&
-    stepDown <= 0.08 &&
-    ctx.velocityY <= 0 &&
-    pFeet >= box.max.y - 0.05
+    stepDown >= BOX_REST_STEP_MIN &&
+    stepDown <= BOX_REST_STEP_MAX &&
+    state.velocityY <= 0 &&
+    pFeet >= box.max.y - BOX_REST_FEET_MARGIN
   ) {
     return { topY: box.max.y, priority: box.max.y };
   }
@@ -217,19 +273,17 @@ function evaluateBoxLanding(
   // Feet must be at or below the top plane to land (not jumping up through it).
   if (stepDown > LAND_SNAP_TOLERANCE) return null;
 
-  const onTerrain = pFeet <= groundHeight + 0.2;
-  const falling = ctx.velocityY < 0;
+  const onTerrain = pFeet <= groundHeight + ON_TERRAIN_FEET_ABOVE;
   const crossedTopPlane =
     falling &&
-    ctx.prevFeetY >= box.max.y - BOX_TOP_LAND_MARGIN &&
+    state.prevFeetY >= box.max.y - BOX_TOP_LAND_MARGIN &&
     pFeet <= box.max.y + BOX_TOP_LAND_MARGIN;
 
-  // Mid-air only — collidable tops never auto-step from grounded walk (prevents
-  // slope exploits where feet are already near box.max.y on elevated terrain).
-  if (!onTerrain && falling && isNearBoxTop(px, pz, box)) {
+  // Mid-air only — require feet at/above top plane unless swept across it this frame.
+  if (!onTerrain && falling) {
     if (
       crossedTopPlane ||
-      (stepDown > -BOX_TOP_LAND_MARGIN && stepDown <= LAND_SNAP_TOLERANCE)
+      (stepDown >= 0 && stepDown <= LAND_SNAP_TOLERANCE)
     ) {
       return { topY: box.max.y, priority: box.max.y };
     }
@@ -240,7 +294,7 @@ function evaluateBoxLanding(
 
 function resolveBoxFloors(
   eyePos: THREE.Vector3,
-  ctx: FloorContext,
+  state: MovementState,
   collidables: THREE.Mesh[],
   groundHeight: number,
 ): FloorResolveResult {
@@ -254,7 +308,7 @@ function resolveBoxFloors(
       eyePos.x,
       eyePos.z,
       box,
-      ctx,
+      state,
       groundHeight,
     );
     if (candidate && (!best || candidate.priority > best.priority)) {
@@ -264,10 +318,11 @@ function resolveBoxFloors(
 
   if (!best) {
     return {
-      velocityY: ctx.velocityY,
-      canJump: ctx.canJump,
+      velocityY: state.velocityY,
+      canJump: state.canJump,
       onSurface: false,
       feetY: pFeet,
+      smoothedGroundY: state.smoothedGroundY,
     };
   }
 
@@ -277,6 +332,7 @@ function resolveBoxFloors(
     canJump: true,
     onSurface: true,
     feetY: best.topY,
+    smoothedGroundY: best.topY,
   };
 }
 
@@ -286,33 +342,49 @@ function applyTerrainFollow(
   canJump: boolean,
   groundHeight: number,
   feetOnBox: boolean,
+  delta: number,
+  smoothedGroundY: number,
+  wasOnSurface: boolean,
+  isMoving: boolean,
 ): FloorResolveResult {
   const pFeet = feetY(eyePos.y);
   const feetAboveGround = pFeet - groundHeight;
-  const rising = !canJump && velocityY > 0.1;
+  const rising = !canJump && velocityY > RISING_VELOCITY_THRESHOLD;
+  const stickCeiling = wasOnSurface ? TERRAIN_STICK_LEAVE : TERRAIN_STICK_FEET;
 
   if (
     !feetOnBox &&
-    feetAboveGround <= TERRAIN_STICK_FEET &&
-    feetAboveGround >= -0.15 &&
+    feetAboveGround <= stickCeiling &&
+    feetAboveGround >= TERRAIN_STICK_BELOW &&
     velocityY <= 0 &&
     !rising
   ) {
-    const targetY = groundHeight + PLAYER_EYE_HEIGHT;
-    eyePos.y = THREE.MathUtils.lerp(eyePos.y, targetY, 0.25);
+    const justLanded = !wasOnSurface;
+    const nextGroundY =
+      justLanded || (!isMoving && wasOnSurface)
+        ? groundHeight
+        : smoothGroundHeight(smoothedGroundY, groundHeight, delta);
+    eyePos.y = nextGroundY + PLAYER_EYE_HEIGHT;
     return {
       velocityY: 0,
       canJump: true,
       onSurface: true,
-      feetY: groundHeight,
+      feetY: nextGroundY,
+      smoothedGroundY: nextGroundY,
     };
   }
 
-  return { velocityY, canJump, onSurface: false, feetY: pFeet };
+  return {
+    velocityY,
+    canJump,
+    onSurface: false,
+    feetY: pFeet,
+    smoothedGroundY,
+  };
 }
 
 /** Highest box top under the player that the feet are resting on. */
-function feetRestingOnBox(
+function getBoxSupportAtFeet(
   px: number,
   pz: number,
   pFeet: number,
@@ -325,7 +397,7 @@ function feetRestingOnBox(
     if (!overlapsXZ(px, pz, box)) continue;
 
     const stepDown = pFeet - box.max.y;
-    if (stepDown >= -0.08 && stepDown <= 0.2) {
+    if (stepDown >= FEET_RESTING_STEP_MIN && stepDown <= FEET_RESTING_STEP_MAX) {
       if (top === null || box.max.y > top) top = box.max.y;
     }
   }
@@ -333,43 +405,52 @@ function feetRestingOnBox(
   return top;
 }
 
+function isFeetOnBox(boxSupport: number | null, pFeet: number): boolean {
+  return boxSupport !== null && pFeet >= boxSupport - FEET_ON_BOX_MARGIN;
+}
+
 export function resolveFloors(
   eyePos: THREE.Vector3,
-  ctx: FloorContext,
+  state: MovementState,
   world: CollisionWorld,
   raycaster: THREE.Raycaster,
   rayOrigin: THREE.Vector3,
+  isMoving: boolean,
+  delta: number = 0,
 ): FloorResolveResult {
   const groundHeight = world.groundMesh
-    ? sampleGroundHeight(world.groundMesh, eyePos.x, eyePos.z, raycaster, rayOrigin)
+    ? sampleTerrainHeight(
+        world.groundMesh,
+        eyePos.x,
+        eyePos.z,
+        state.prevEyeX,
+        state.prevEyeZ,
+        raycaster,
+        rayOrigin,
+      )
     : 0;
 
   const pFeet = feetY(eyePos.y);
-  const boxSupport = feetRestingOnBox(
-    eyePos.x,
-    eyePos.z,
+  const feetOnBox = isFeetOnBox(
+    getBoxSupportAtFeet(eyePos.x, eyePos.z, pFeet, world.collidables),
     pFeet,
-    world.collidables,
   );
-  const feetOnBox = boxSupport !== null && pFeet >= boxSupport - 0.1;
 
   const recovery = recoverFromTerrainPenetration(eyePos, groundHeight, feetOnBox);
   if (recovery) return recovery;
 
-  const boxResult = resolveBoxFloors(eyePos, ctx, world.collidables, groundHeight);
+  const boxResult = resolveBoxFloors(eyePos, state, world.collidables, groundHeight);
 
   if (boxResult.onSurface) {
     return boxResult;
   }
 
+  // Re-sample after box resolve may have moved eye Y (terrain follow must not treat box tops as terrain).
   const pFeetAfter = feetY(eyePos.y);
-  const boxSupportAfter = feetRestingOnBox(
-    eyePos.x,
-    eyePos.z,
+  const feetOnBoxAfter = isFeetOnBox(
+    getBoxSupportAtFeet(eyePos.x, eyePos.z, pFeetAfter, world.collidables),
     pFeetAfter,
-    world.collidables,
   );
-  const feetOnBoxAfter = boxSupportAfter !== null && pFeetAfter >= boxSupportAfter - 0.1;
 
   if (world.groundMesh) {
     return applyTerrainFollow(
@@ -378,12 +459,22 @@ export function resolveFloors(
       boxResult.canJump,
       groundHeight,
       feetOnBoxAfter,
+      delta,
+      state.smoothedGroundY,
+      state.onSurface,
+      isMoving,
     );
   }
 
   if (eyePos.y < PLAYER_EYE_HEIGHT) {
     eyePos.y = PLAYER_EYE_HEIGHT;
-    return { velocityY: 0, canJump: true, onSurface: true, feetY: 0 };
+    return {
+      velocityY: 0,
+      canJump: true,
+      onSurface: true,
+      feetY: 0,
+      smoothedGroundY: 0,
+    };
   }
 
   return boxResult;

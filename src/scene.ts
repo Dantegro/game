@@ -1,7 +1,9 @@
 import * as THREE from "three";
+import type { GameModeId } from "./gameModes.js";
+import { sampleGroundHeight } from "./player/collision.js";
 import { createClouds } from "./world/clouds.js";
 
-export function createWorld() {
+export function createWorld(mode: GameModeId = "open-world") {
   const scene = new THREE.Scene();
   scene.fog = new THREE.FogExp2(0x87ceeb, 0.0018);
 
@@ -16,16 +18,11 @@ export function createWorld() {
   groundGeo.rotateX(-Math.PI / 2);
   const gpos = groundGeo.attributes.position;
   for (let i = 0; i < gpos.count; i++) {
-    // Lower amplitude and higher resolution for more consistent/smoother uneven ground.
-    // Still a bit of natural variation (rolling hills), but less extreme and smoother.
     gpos.setY(i, gpos.getY(i) + (Math.random() - 0.5) * 1.8);
   }
   gpos.needsUpdate = true;
   groundGeo.computeVertexNormals();
 
-  // Add vertex colors based on height for "color depth".
-  // More vibrant, saturated pure greens (less yellow/earthy tones that read as sand/dirt).
-  // Low areas: deep lush green. High areas: bright vibrant grass. Feels more natural and appealing.
   const colors: number[] = [];
   let minY = Infinity;
   let maxY = -Infinity;
@@ -34,16 +31,16 @@ export function createWorld() {
     if (y < minY) minY = y;
     if (y > maxY) maxY = y;
   }
-  const lowColor = new THREE.Color(0x2e6b3e);   // deep rich vibrant green (lush, not sandy)
-  const highColor = new THREE.Color(0x5fc85f);  // bright fresh vibrant grass green
+  const lowColor = new THREE.Color(0x2e6b3e);
+  const highColor = new THREE.Color(0x5fc85f);
+  const tempColor = new THREE.Color();
   for (let i = 0; i < gpos.count; i++) {
     const y = gpos.getY(i);
     const t = (y - minY) / (maxY - minY || 1);
-    // Bias a bit toward the vibrant high end for lively feel overall
-    const c = lowColor.clone().lerp(highColor, t * 0.75 + 0.25);
-    colors.push(c.r, c.g, c.b);
+    tempColor.copy(lowColor).lerp(highColor, t * 0.75 + 0.25);
+    colors.push(tempColor.r, tempColor.g, tempColor.b);
   }
-  groundGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  groundGeo.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
 
   const ground = new THREE.Mesh(
     groundGeo,
@@ -55,13 +52,13 @@ export function createWorld() {
 
   const collidables: THREE.Mesh[] = [];
 
-  // Raycaster to place boxes on the actual uneven ground
   const raycaster = new THREE.Raycaster();
-  const down = new THREE.Vector3(0, -1, 0);
+  const rayOrigin = new THREE.Vector3();
+  const candidateBox = new THREE.Box3();
+  const existingBox = new THREE.Box3();
+
   function getGroundHeightAt(wx: number, wz: number) {
-    raycaster.set(new THREE.Vector3(wx, 100, wz), down);
-    const hits = raycaster.intersectObject(ground, false);
-    return hits.length > 0 ? hits[0].point.y : 0;
+    return sampleGroundHeight(ground, wx, wz, raycaster, rayOrigin);
   }
 
   function randomInRange(min: number, max: number): number {
@@ -69,13 +66,13 @@ export function createWorld() {
   }
 
   function wouldOverlap(candidate: THREE.Mesh): boolean {
-    const cBox = new THREE.Box3().setFromObject(candidate);
+    candidateBox.setFromObject(candidate);
     const margin = 0.25;
     for (const ex of collidables) {
-      const eBox = new THREE.Box3().setFromObject(ex);
-      eBox.min.addScalar(-margin);
-      eBox.max.addScalar(margin);
-      if (eBox.intersectsBox(cBox)) {
+      existingBox.setFromObject(ex);
+      existingBox.min.addScalar(-margin);
+      existingBox.max.addScalar(margin);
+      if (existingBox.intersectsBox(candidateBox)) {
         return true;
       }
     }
@@ -87,12 +84,14 @@ export function createWorld() {
     new THREE.MeshLambertMaterial({ color: 0xff2222 }),
   );
   const ghRed = getGroundHeightAt(3, -12);
-  cube.position.set(3, ghRed + 4.5 + 0.1, -12); // bottom just above local ground
+  cube.position.set(3, ghRed + 4.5 + 0.1, -12);
   scene.add(cube);
   collidables.push(cube);
 
-  // Tall buildings (main obstacles). Varied size; tops sit above normal jump reach.
-  for (let i = 0; i < 18; i++) {
+  const tallBuildingCount = mode === "hunted" ? 22 : 18;
+
+  // Tall buildings
+  for (let i = 0; i < tallBuildingCount; i++) {
     for (let attempt = 0; attempt < 25; attempt++) {
       const width = randomInRange(2.8, 5.2);
       const depth = randomInRange(2.8, 5.2);
@@ -118,7 +117,7 @@ export function createWorld() {
     }
   }
 
-  // Shorter boxes / low platforms the player can jump onto — varied footprint and height.
+  // Low jumpable platforms
   for (let i = 0; i < 10; i++) {
     for (let attempt = 0; attempt < 25; attempt++) {
       const width = randomInRange(2.0, 4.4);
@@ -135,7 +134,6 @@ export function createWorld() {
       const gh = getGroundHeightAt(bx, bz);
       b.position.set(bx, gh + height / 2 + 0.1, bz);
       if (Math.random() < 0.4) {
-        // slight variation toward woodier tones
         b.material.color.setHex(0xA0522D + ((Math.random() * 0x333333) | 0));
       }
       if (!wouldOverlap(b)) {
@@ -146,5 +144,5 @@ export function createWorld() {
     }
   }
 
-  return { scene, cube, collidables, ground, clouds };
+  return { scene, cube, collidables, ground, clouds, mode };
 }

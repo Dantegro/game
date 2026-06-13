@@ -20,6 +20,7 @@ Open the URL Vite prints (usually `http://localhost:5173`).
 | **W A S D** | Move |
 | **Space** | Jump |
 | **Mouse** | Look (while pointer is locked) |
+| **C** (hold) | Third-person view (camera pulls back behind your character while you keep mouse look control; release to return to first-person) |
 | **M** | Toggle music |
 | **[** / **]** or **-** / **+** | Lower / raise music volume |
 | **Enter** | Start game (from menu) |

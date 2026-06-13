@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as THREE from "three";
-import { createClouds, disposeCloudGeometry } from "./clouds.js";
+import { createClouds, disposeCloudGeometry, updateClouds } from "./clouds.js";
 
 describe("createClouds", () => {
   it("builds volumetric sphere clusters with drift metadata", () => {
@@ -21,6 +21,23 @@ describe("createClouds", () => {
         expect((mesh.material as THREE.MeshBasicMaterial).transparent).toBe(true);
       }
     }
+
+    disposeCloudGeometry();
+  });
+});
+
+describe("updateClouds", () => {
+  it("drifts clouds horizontally and wraps when past the play boundary", () => {
+    const scene = new THREE.Scene();
+    const clouds = createClouds(scene, 1);
+    const cloud = clouds[0];
+    cloud.position.x = 260;
+    const startZ = cloud.position.z;
+
+    updateClouds(clouds, 0.5);
+
+    expect(cloud.position.x).toBeLessThan(0);
+    expect(cloud.position.z).not.toBe(startZ);
 
     disposeCloudGeometry();
   });

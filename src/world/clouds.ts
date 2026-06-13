@@ -115,3 +115,21 @@ export function createClouds(scene: THREE.Scene, count = 14): CloudGroup[] {
 
   return clouds;
 }
+
+const CLOUD_WRAP_X = 250;
+const CLOUD_Y_MIN = 82;
+const CLOUD_Y_RANGE = 55;
+const CLOUD_Z_RANGE = 400;
+
+/** Drift cloud clusters horizontally and wrap them when they leave the play area. */
+export function updateClouds(clouds: CloudGroup[], delta: number): void {
+  for (const cloud of clouds) {
+    cloud.position.x += cloud.userData.speed * delta;
+
+    if (cloud.position.x > CLOUD_WRAP_X) {
+      cloud.position.x = -CLOUD_WRAP_X - Math.random() * 30;
+      cloud.position.z = (Math.random() - 0.5) * CLOUD_Z_RANGE;
+      cloud.position.y = CLOUD_Y_MIN + Math.random() * CLOUD_Y_RANGE;
+    }
+  }
+}

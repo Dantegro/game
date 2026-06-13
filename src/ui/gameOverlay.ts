@@ -15,19 +15,17 @@ export function buildGameStartOverlay(onExitToMenu?: () => void): GameStartOverl
   overlay.className = "game-start-overlay";
   overlay.style.cssText =
     "position:fixed;inset:0;place-items:center;color:#ccc;font-family:sans-serif;text-align:center;z-index:10;background:linear-gradient(rgba(0,0,0,0.12),rgba(0,0,0,0.2));user-select:none;cursor:pointer;border:none;padding:0;margin:0;width:100%;";
-  // Start hidden; show() is called explicitly by lock/unlock handlers or initial entry logic
   overlay.style.display = "none";
 
   const content = document.createElement("div");
 
   if (onExitToMenu) {
-    // In-game pause / entry screen (explicit back to menu available)
     const title = document.createElement("div");
     title.style.cssText = "font-size:28px;margin-bottom:12px;";
     title.textContent = "Paused";
 
     const info = document.createElement("div");
-    info.innerHTML = "Click anywhere to resume<br><small>ESC also resumes • Shift to sprint (stamina)</small>";
+    info.innerHTML = "Click anywhere to resume<br><small>ESC also resumes • Shift to sprint (stamina) • Hold C for third person</small>";
 
     const backBtn = document.createElement("button");
     backBtn.textContent = "Back to Menu";
@@ -44,9 +42,8 @@ export function buildGameStartOverlay(onExitToMenu?: () => void): GameStartOverl
       "aria-label": "Game paused. Click anywhere (or ESC) to resume, or Back to Menu.",
     });
   } else {
-    // Original entry prompt (if ever called without callback)
     content.innerHTML =
-      '<span aria-hidden="true">Click to start<br><small>WASD to move • Space to jump • Mouse to look</small><br><small>(enters fullscreen for immersion)</small></span>';
+      '<span aria-hidden="true">Click to start<br><small>WASD to move • Space to jump • Mouse to look • Hold C for third person</small><br><small>(enters fullscreen for immersion)</small></span>';
 
     applyA11y(overlay, {
       "aria-label":

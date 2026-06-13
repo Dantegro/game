@@ -8,6 +8,12 @@ import {
 import type { CollisionWorld } from "./player/collision.js";
 import { placePlayerOnGround } from "./player/collision.js";
 import { buildGameStartOverlay } from "./ui/gameOverlay.js";
+import { disposeMeshes } from "./disposeMeshes.js";
+import {
+  createPlayerModel,
+  stepThirdPersonTransition,
+  updateThirdPersonView,
+} from "./player/view.js";
 
 export interface PlayerAPI {
   camera: THREE.PerspectiveCamera;
@@ -15,25 +21,33 @@ export interface PlayerAPI {
   updateMovement: (delta: number) => void;
   dispose: () => void;
   getStamina: () => number;
+  onResize: (width: number, height: number) => void;
 }
 
 export function initPlayerControls(
   domElement: HTMLElement,
+  scene: THREE.Scene,
   collidables: THREE.Mesh[] = [],
   groundMesh?: THREE.Mesh,
   onExitToMenu?: () => void,
 ): PlayerAPI {
-  const camera = new THREE.PerspectiveCamera(
+  const lookCamera = new THREE.PerspectiveCamera(
     75,
     window.innerWidth / window.innerHeight,
     0.1,
     500,
   );
-  camera.position.set(0, 3, 2);
-  camera.lookAt(0, 2.5, -12);
-  const initialCameraQuaternion = camera.quaternion.clone();
+  lookCamera.position.set(0, 3, 2);
+  lookCamera.lookAt(0, 2.5, -12);
 
-  const controls = new PointerLockControls(camera, domElement);
+  const renderCamera = new THREE.PerspectiveCamera(
+    75,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    500,
+  );
+
+  const controls = new PointerLockControls(lookCamera, domElement);
 
   const startOverlay = buildGameStartOverlay(onExitToMenu);
   document.body.appendChild(startOverlay.element);
@@ -55,7 +69,6 @@ export function initPlayerControls(
     startOverlay.hide();
     controls.enabled = true;
     controls.pointerSpeed = 1;
-    camera.quaternion.copy(initialCameraQuaternion);
   });
 
   controls.addEventListener("unlock", () => {
@@ -72,10 +85,6 @@ export function initPlayerControls(
     if (controls.isLocked) {
       e.preventDefault();
       e.stopImmediatePropagation();
-
-      if (e.ctrlKey || e.metaKey || e.altKey) {
-        e.stopImmediatePropagation();
-      }
     }
   };
 
@@ -103,13 +112,23 @@ export function initPlayerControls(
 
   const world: CollisionWorld = { collidables, groundMesh };
 
+  const playerEyePos = new THREE.Vector3().copy(lookCamera.position);
+
   const spawnGroundY = placePlayerOnGround(
-    camera.position,
+    playerEyePos,
     world,
     raycaster,
     rayOrigin,
   );
   movementState.prevFeetY = spawnGroundY;
+  movementState.smoothedGroundY = spawnGroundY;
+  movementState.onSurface = true;
+  movementState.prevEyeX = playerEyePos.x;
+  movementState.prevEyeZ = playerEyePos.z;
+
+  const playerModel = createPlayerModel();
+  scene.add(playerModel);
+  let thirdPersonT = 0;
 
   function readInput(): MovementInput {
     return {
@@ -121,16 +140,40 @@ export function initPlayerControls(
   }
 
   function updateMovement(delta: number) {
+    const input = readInput();
+
     updatePlayerMovement(
       delta,
-      camera,
-      controls,
-      readInput(),
+      playerEyePos,
+      lookCamera.quaternion,
+      input,
       movementState,
       world,
       raycaster,
       rayOrigin,
+      controls.isLocked,
     );
+
+    const holdingThirdPerson = !!keys["KeyC"];
+    const targetT = holdingThirdPerson ? 1 : 0;
+    thirdPersonT = stepThirdPersonTransition(thirdPersonT, targetT, delta);
+
+    updateThirdPersonView(
+      renderCamera,
+      playerEyePos,
+      lookCamera.quaternion,
+      thirdPersonT,
+      playerModel,
+      delta,
+    );
+  }
+
+  function onResize(width: number, height: number) {
+    const aspect = width / height;
+    lookCamera.aspect = aspect;
+    lookCamera.updateProjectionMatrix();
+    renderCamera.aspect = aspect;
+    renderCamera.updateProjectionMatrix();
   }
 
   function dispose() {
@@ -139,13 +182,17 @@ export function initPlayerControls(
     window.removeEventListener("keydown", handleKeyDown);
     window.removeEventListener("keyup", handleKeyUp);
     domElement.removeEventListener("contextmenu", handleContextMenu);
+
+    scene.remove(playerModel);
+    disposeMeshes(playerModel);
   }
 
   return {
-    camera,
+    camera: renderCamera,
     controls,
     updateMovement,
     dispose,
     getStamina: () => movementState.stamina,
+    onResize,
   };
 }

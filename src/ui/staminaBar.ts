@@ -1,7 +1,5 @@
 /**
- * Minimal in-game stamina bar for sprinting.
- * Pure DOM, zero WebGL cost, matches the dark prototype aesthetic.
- * Shown only while the game canvas is active.
+ * In-game stamina bar (DOM overlay).
  */
 export interface StaminaBar {
   element: HTMLDivElement;
@@ -41,7 +39,6 @@ export function createStaminaBar(): StaminaBar {
   function update(stamina: number, max: number) {
     const pct = Math.max(0, Math.min(1, stamina / max));
     fill.style.width = `${pct * 100}%`;
-    // Tint red when low
     if (pct < 0.3) {
       fill.style.background = "#a44";
     } else {
@@ -58,9 +55,6 @@ export function createStaminaBar(): StaminaBar {
   function remove() {
     container.remove();
   }
-
-  // Start hidden; main.ts will show it when the game canvas becomes active.
-  hide();
 
   return {
     element: container,

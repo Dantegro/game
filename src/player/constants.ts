@@ -30,12 +30,48 @@ export const PLAYER_FEET_OFFSET = 2.85;
 export const PLAYER_EYE_HEIGHT = 3.0;
 
 export const WALL_FRICTION = 0.82;
-/** Max height for auto-step onto terrain; collidable tops always require a jump. */
-export const MAX_STEP_HEIGHT = 1.8;
 export const LAND_SNAP_TOLERANCE = 0.4;
 /** Extra XZ leeway when snapping onto a box top (lip / corner landings). */
-export const BOX_TOP_EDGE_GRACE = 0.2;
+export const BOX_TOP_EDGE_GRACE = 0.27;
 /** Vertical window around a box top for lip clearance and swept landing. */
-export const BOX_TOP_LAND_MARGIN = 0.11;
-/** Feet within this of terrain surface → follow ground height. */
+export const BOX_TOP_LAND_MARGIN = 0.13;
+/** Feet within this of terrain surface → attach when approaching from air. */
 export const TERRAIN_STICK_FEET = 0.25;
+
+/** Looser ceiling while already grounded — prevents onSurface flicker when smoothed height lags after landing. */
+export const TERRAIN_STICK_LEAVE = 0.55;
+
+/** Low-pass time constants for smoothed ground height (feet Y), not eye Y directly.
+ *  Uphill uses a faster tau so the camera does not sink into rises while sprinting;
+ *  downhill uses a slower tau to damp triangle-edge pops on the procedural mesh. */
+export const TERRAIN_GROUND_SMOOTH_TAU_UP = 0.09;
+export const TERRAIN_GROUND_SMOOTH_TAU_DOWN = 0.24;
+
+/** Max allowed lag of smoothed ground below the sampled height when climbing (prevents visible foot sink). */
+export const TERRAIN_MAX_SINK = 0.1;
+
+/** Box-top resting / landing tolerances (feet relative to box.max.y). */
+export const BOX_REST_STEP_MIN = -0.03;
+export const BOX_REST_STEP_MAX = 0.08;
+export const BOX_REST_FEET_MARGIN = 0.05;
+export const ON_TERRAIN_FEET_ABOVE = 0.2;
+export const FEET_RESTING_STEP_MIN = -0.08;
+export const FEET_RESTING_STEP_MAX = 0.2;
+export const FEET_ON_BOX_MARGIN = 0.1;
+
+/** Terrain penetration recovery and stick bands. */
+export const TERRAIN_PENETRATION_TOLERANCE = 0.05;
+export const TERRAIN_STICK_BELOW = -0.15;
+export const TERRAIN_SAMPLE_MOVE_THRESHOLD = 0.02;
+export const TERRAIN_SAMPLE_PRIMARY_WEIGHT = 0.65;
+export const TERRAIN_SAMPLE_MIDPOINT_WEIGHT = 0.35;
+
+/** Vertical velocity above which the player is treated as rising (blocks terrain stick). */
+export const RISING_VELOCITY_THRESHOLD = 0.1;
+
+/** Third-person view tuning (hold C). */
+export const THIRD_PERSON_DISTANCE = 4.2;
+export const THIRD_PERSON_HEIGHT = 1.7;
+export const THIRD_PERSON_TRANSITION_TAU = 0.22;
+/** Low-pass smoothing during the FP↔TP camera blend. */
+export const THIRD_PERSON_POSITION_SMOOTH_TAU = 0.05;
